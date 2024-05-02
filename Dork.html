@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SQLi Dork Scanner</title>
+</head>
+<body>
+    <h1>SQLi Dork Scanner</h1>
+    <form id="dorkForm">
+        <label for="dork">Enter Google dork:</label>
+        <input type="text" id="dork" name="dork" required>
+        <button type="submit">Scan</button>
+    </form>
+    <div id="results"></div>
+
+    <script>
+        const dorkForm = document.getElementById('dorkForm');
+        const resultsDiv = document.getElementById('results');
+
+        dorkForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const dork = document.getElementById('dork').value;
+            const url = `https://www.google.com/search?q=${encodeURIComponent(dork)}`;
+
+            try {
+                const response = await fetch(url);
+                const text = await response.text();
+
+                // Parse the HTML response to extract URLs
+                const urls = extractUrls(text);
+
+                // Perform scanning and vulnerability detection
+                const vulnerabilities = await scanUrls(urls);
+
+                // Display the results
+                displayResults(vulnerabilities);
+            } catch (error) {
+                console.error('Error:', error);
+                resultsDiv.innerHTML = '<p>An error occurred while scanning.</p>';
+            }
+        });
+
+        // Function to extract URLs from the HTML response
+        function extractUrls(html) {
+            const regex = /https?:\/\/[^\s"]+/g;
+            return html.match(regex) || [];
+        }
+
+        // Function to scan URLs and detect SQL injection vulnerabilities
+        async function scanUrls(urls) {
+            const vulnerabilities = [];
+
+            for (const url of urls) {
+                try {
+                    const response = await fetch(url);
+                    const text = await response.text();
+
+                    // Check for SQL injection vulnerabilities using specific payloads
+                    if (isVulnerable(text)) {
+                        vulnerabilities.push(url);
+                    }
+                } catch (error) {
+                    console.error('Error scanning URL:', url, error);
+                }
+            }
+
+            return vulnerabilities;
+        }
+
+        // Function to check if the response contains any SQL injection vulnerabilities
+        function isVulnerable(responseText) {
+            const payloads = ["' OR 1=1--", "' OR '1'='1", "' OR 1=1#", "' OR '1'='1#", "' OR 'x'='x", "' OR 'a'='a"];
+
+            for (const payload of payloads) {
+                if (responseText.includes(payload)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // Function to display the results
+        function displayResults(vulnerabilities) {
+            if (vulnerabilities.length === 0) {
+                resultsDiv.innerHTML = '<p>No SQL injection vulnerabilities found.</p>';
+            } else {
+                let resultHTML = '<h2>Vulnerable URLs:</h2><ul>';
+                vulnerabilities.forEach(url => {
+                    resultHTML += `<li><a href="${url}">${url}</a></li>`;
+                });
+                resultHTML += '</ul>';
+                resultsDiv.innerHTML = resultHTML;
+            }
+        }
+    </script>
+</body>
+</html>
